@@ -83,6 +83,32 @@ export default defineConfig(async config => {
     publicDir: command === "serve" ? "assets" : false,
     server: {
       port: Number.isNaN(envPort) ? 8000 : envPort,
+      proxy: {
+        "/regolo-api": {
+          target: "https://api.regolo.ai",
+          changeOrigin: true,
+          secure: false,
+          timeout: 120000,
+          proxyTimeout: 120000,
+          rewrite: (path: string) => path.replace(/^\/regolo-api/, ""),
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              const authHeader = proxyReq.getHeader("authorization");
+              const hasAuth = typeof authHeader === "string" && authHeader.length > 10;
+              console.log(`[regolo-proxy] → ${req.method} ${req.url} auth=${hasAuth ? "yes" : "NO"}`);
+            });
+            proxy.on("proxyRes", (proxyRes, req) => {
+              console.log(`[regolo-proxy] ← ${proxyRes.statusCode} ${req.url}`);
+            });
+            proxy.on("error", (err, req) => {
+              console.error(`[regolo-proxy] ✗ ERROR ${req.url}:`, err.message);
+            });
+            proxy.on("econnreset", (err, req) => {
+              console.error(`[regolo-proxy] ✗ ECONNRESET ${req.url}:`, err.message);
+            });
+          },
+        },
+      },
     },
   } satisfies UserConfig;
 });
